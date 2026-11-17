@@ -6,6 +6,7 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -51,6 +52,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.example.captura_audio_micrfono.ui.theme.Captura_Audio_MicrófonoTheme
@@ -141,23 +143,32 @@ fun Microfono(modifier: Modifier = Modifier) {
             verticalArrangement = Arrangement.spacedBy(18.dp),
             horizontalAlignment = Alignment.Start
         ) {
-            Text(
-                text = "Luz y color",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = "Consulta la iluminación y cambia el fondo usando tu voz.",
-                style = MaterialTheme.typography.bodyLarge
-            )
-
-            SensorLuz()
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = Color(0xFFF8FAFF),
+                contentColor = Color(0xFF1C2430),
+                shape = RoundedCornerShape(20.dp)
+            ) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Text(
+                        text = "Sensores y voz",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "Explora la luz y el movimiento, cambia el color y toma una foto.",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                }
+            }
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f)
+                    containerColor = Color(0xFFF8FAFF),
+                    contentColor = Color(0xFF1C2430)
                 ),
                 elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
             ) {
@@ -216,6 +227,173 @@ fun Microfono(modifier: Modifier = Modifier) {
                     }
                 }
             }
+            Camara()
+            SensorLuz()
+            SensorAcelerometro()
+        }
+    }
+}
+
+@Composable
+fun Camara(modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    var imagen by remember { mutableStateOf<Bitmap?>(null) }
+    var mensaje by remember { mutableStateOf("Toma una foto para verla aquí.") }
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicturePreview()
+    ) { bitmap ->
+        if (bitmap != null) {
+            imagen = bitmap
+            mensaje = "Vista previa capturada"
+        } else {
+            mensaje = "No se tomó ninguna foto."
+        }
+    }
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            try {
+                cameraLauncher.launch(null)
+            } catch (_: ActivityNotFoundException) {
+                mensaje = "No hay una aplicación de cámara disponible."
+            }
+        } else {
+            mensaje = "Se necesita permiso para usar la cámara."
+        }
+    }
+
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color(0xFFF8FAFF),
+            contentColor = Color(0xFF1C2430)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text("Cámara", style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold)
+            Text(text = mensaje, style = MaterialTheme.typography.bodyLarge)
+            Button(
+                onClick = {
+                    if (ContextCompat.checkSelfPermission(
+                            context, Manifest.permission.CAMERA
+                        ) == PackageManager.PERMISSION_GRANTED
+                    ) {
+                        try {
+                            cameraLauncher.launch(null)
+                        } catch (_: ActivityNotFoundException) {
+                            mensaje = "No hay una aplicación de cámara disponible."
+                        }
+                    } else {
+                        permissionLauncher.launch(Manifest.permission.CAMERA)
+                    }
+                },
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Text("Abrir cámara", style = MaterialTheme.typography.titleMedium)
+            }
+            imagen?.let { bitmap ->
+                Image(
+                    bitmap = bitmap.asImageBitmap(),
+                    contentDescription = "Foto tomada con la cámara",
+                    modifier = Modifier.fillMaxWidth().height(220.dp)
+                        .clip(RoundedCornerShape(14.dp)),
+                    contentScale = ContentScale.Fit
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun SensorAcelerometro(modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val sensorManager = remember {
+        context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
+    }
+    val acelerometro = remember {
+        sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+    }
+    var x by remember { mutableStateOf(0f) }
+    var y by remember { mutableStateOf(0f) }
+    var z by remember { mutableStateOf(0f) }
+    val sensorDisponible = acelerometro != null
+
+    DisposableEffect(sensorDisponible) {
+        if (!sensorDisponible) {
+            return@DisposableEffect onDispose { }
+        }
+
+        val listener = object : SensorEventListener {
+            override fun onSensorChanged(event: SensorEvent) {
+                x = event.values[0]
+                y = event.values[1]
+                z = event.values[2]
+            }
+
+            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
+        }
+
+        sensorManager.registerListener(
+            listener,
+            acelerometro,
+            SensorManager.SENSOR_DELAY_NORMAL
+        )
+
+        onDispose {
+            sensorManager.unregisterListener(listener)
+        }
+    }
+
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color(0xFFF8FAFF),
+            contentColor = Color(0xFF1C2430)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                text = "Acelerómetro",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            if (sensorDisponible) {
+                Text(
+                    text = "X: %.2f".format(x),
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Text(
+                    text = "Y: %.2f".format(y),
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Text(
+                    text = "Z: %.2f".format(z),
+                    style = MaterialTheme.typography.bodyLarge
+                )
+            } else {
+                Text(
+                    text = "No hay acelerómetro",
+                    style = MaterialTheme.typography.bodyLarge
+                )
+            }
         }
     }
 }
@@ -265,7 +443,8 @@ fun SensorLuz(modifier: Modifier = Modifier) {
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f)
+            containerColor = Color(0xFFF8FAFF),
+            contentColor = Color(0xFF1C2430)
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {

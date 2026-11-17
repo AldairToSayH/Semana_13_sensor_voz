@@ -7,6 +7,8 @@ Aplicación Android desarrollada con Kotlin y Jetpack Compose.
 - Solicita permiso para utilizar el micrófono.
 - Reconoce órdenes de voz en español y cambia el color de fondo.
 - Lee en tiempo real el sensor de luz del dispositivo.
+- Lee en tiempo real los ejes X, Y y Z del acelerómetro.
+- Solicita permiso de cámara al abrirla y muestra una vista previa de la foto tomada.
 - Muestra una imagen de acuerdo con la iluminación:
   - Menos de 50 lux: anochecer.
   - Entre 50 y 499 lux: atardecer.
